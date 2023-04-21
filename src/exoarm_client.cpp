@@ -44,6 +44,13 @@ int8_t ExoArmClient::init_tcp_client(const char* addr, int port){
     
 }
 
+void ExoArmClient::disconnect_tcp(){
+
+    close(client_fd);
+    std::cout << "Client disconnected" << std::endl;
+
+}
+
 void ExoArmClient::set_robot_inputs(bool power_state,
                                     bool enable_state,
                                     float joint_position_ref[6],
@@ -93,7 +100,7 @@ void ExoArmClient::set_controller_inputs(float* joint_position_ref,
 }
 
 
-int8_t ExoArmClient::send_control_packet(){
+int8_t ExoArmClient::send_cmd_packet(){
 
     protoClientToRobot.set_header(protoClientToRobot.header() + 1);
     std::string output_str;
@@ -108,17 +115,17 @@ int8_t ExoArmClient::send_control_packet(){
 
 }
 
-int8_t ExoArmClient::receive_control_packet(){
+int8_t ExoArmClient::receive_fb_packet(){
 
-    int n = select(client_fd+1, &input_fd, NULL, NULL, &timeout);
+/*     int n = select(client_fd+1, &input_fd, NULL, NULL, &timeout);
     if(n == 0){
         return -1;
-    }
+    } */
     
     valread = recv(client_fd, buffer, sizeof(buffer), 0);
-
-    std::cout << valread << std::endl;
     
+    //std::cout << "Got packet" << std::endl;
+
     std::string input_str = std::string(buffer, valread); 
     bool parsing_success = protoRobotToClient.ParseFromString(input_str);
 
@@ -165,4 +172,38 @@ void ExoArmClient::get_controller_outputs(float* joint_position_fb,
     std::copy(protoRobotToClient.controller_outputs().joint_velocity_fb().begin(),
               protoRobotToClient.controller_outputs().joint_velocity_fb().end(),
               joint_velocity_fb);
+}
+
+void ExoArmClient::print_data(){
+    std::cout << "Header: " << protoRobotToClient.header() << "\n";
+    std::cout << "Robot state: " << protoRobotToClient.robot_state() << "\n";
+    std::cout << "Fault type: " << protoRobotToClient.fault_type() << "\n";
+
+    float joint_position_fb[JOINT_COUNT];
+    float joint_velocity_fb[JOINT_COUNT];
+
+    get_controller_outputs(joint_position_fb, joint_velocity_fb);
+
+    print_array_data(joint_position_fb, (char*) "Joint position ref", JOINT_COUNT);
+    print_array_data(joint_velocity_fb, (char*) "Joint velocity ref", JOINT_COUNT);
+
+    std::cout << "\n";
+}
+
+void ExoArmClient::print_array_data(float* arr, char* name, int arr_size){
+    std::cout << name << ":\t";
+
+    for(int i=0; i<arr_size; i++){
+        std::cout << *(arr+i) << "\t";
+    }
+
+    std::cout << "\n";
+}
+
+void ExoArmClient::listen(){
+    while(true){
+        receive_success = receive_fb_packet();
+        //std::cout << "Receive success: " << static_cast<int16_t>(receive_success) << std::endl;
+        //print_data();
+    }
 }

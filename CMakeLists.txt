@@ -7,4 +7,4 @@ include_directories(include)
 
 add_executable(exoarm_client src/main.cpp src/exoarm_client.cpp)
 
-target_link_libraries(exoarm_client proto)
+target_link_libraries(exoarm_client proto pthread)
